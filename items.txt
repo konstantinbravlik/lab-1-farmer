@@ -1,0 +1,10 @@
+0 empty
+1 seeds
+2 wood
+3 stone
+4 coal
+5 watering can
+6 axe
+7 hoe
+8 rake
+9 scythe
