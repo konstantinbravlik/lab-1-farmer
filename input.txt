@@ -1,0 +1,2 @@
+Smith;8;16;Tavern
+Biba;8;20;Cooler_tavern

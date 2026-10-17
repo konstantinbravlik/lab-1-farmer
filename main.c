@@ -18,6 +18,8 @@ void putItem(char inventoryDesc[][STRING_DEFAULT], int inventory[]); // клад
 void removeItem(char inventoryDesc[][STRING_DEFAULT], int inventory[]); // убираем предметы
 void comparer(char inventoryDesc[][STRING_DEFAULT], int inventory[]);
 void searchItem(char inventoryDesc[][STRING_DEFAULT], int inventory[]);
+void diaryWrite(char* fileName, char name[STRING_DEFAULT], int hour, int day, char inventoryDesc[][STRING_DEFAULT], int inventory[]);
+void decipher(char* fileName, char* fileOutput, int hour);
 
 int main()
 {
@@ -45,17 +47,6 @@ int main()
 		}
 		fclose(fileItems);
 	}
-	FILE* fileDiary = fopen("diary.txt", "a"); // Вот это всё надо будет прибрать в функцию записи или чёт такое
-
-	if (fileDiary == NULL)
-	{
-		printf("error! No diary.txt found\n");
-	}
-	else
-	{
-		fclose(fileDiary);
-	}
-
 
 	printf("Welcome to Happy Farmer(tm, all rights reserved, rated M for Mature)\n\n");
 	printf("What is your name, Farmer? ");
@@ -70,7 +61,10 @@ int main()
 		printf("3 - check your inventory\n");
 		printf("4 - put item in your inventory\n");
 		printf("5 - remove item from inventory\n");
-		printf("6 - find items heavier than X in your inventory\n\n");
+		printf("6 - find items heavier than X in your inventory\n");
+		printf("7 - search for item name\n");
+		printf("8 - write in diary\n");
+		printf("9 - get villager info\n\n");
 
 		playerInput = checkInput("Option: ", ERR_DEFAULT);
 
@@ -99,6 +93,12 @@ int main()
 			break;
 		case 7:
 			searchItem(inventoryDescription, inventory);
+			break;
+		case 8:
+			diaryWrite("diary.txt", playerName, current_hour, current_day, inventoryDescription, inventory);
+			break;
+		case 9:
+			decipher("input.txt", "output.txt", current_hour);
 			break;
 		}
 	}
@@ -155,7 +155,7 @@ void checkInventory(char inventoryDesc[][STRING_DEFAULT], int inventory[])
 	printf("\nYour inventory:\n");
 	for (int i = 0; i < INVENTORY_SIZE; i++)
 	{
-		printf("%s\n", inventoryDesc[inventory[i]]); // наш инвентарь тута
+		printf("[%d] - %s\n", i, inventoryDesc[inventory[i]]); // наш инвентарь тута
 	}
 
 	printf("\n");
@@ -185,7 +185,7 @@ void comparer(char inventoryDesc[][STRING_DEFAULT], int inventory[])
 
 	for (int i = 0; i < INVENTORY_SIZE; i++)
 	{
-		if (inventory[i] > tempInput) printf("%s\n", inventoryDesc[inventory[i]]);
+		if (inventory[i] > tempInput) printf("[%d] - %s\n", i, inventoryDesc[inventory[i]]);
 	}
 
 
@@ -206,4 +206,58 @@ void searchItem(char inventoryDesc[][STRING_DEFAULT], int inventory[])
 		}
 	}
 	if (ctr == 0) printf("no %s found in inventory!\n", input);
+}
+
+void diaryWrite(char* fileName, char name[STRING_DEFAULT], int hour, int day, char inventoryDesc[][STRING_DEFAULT], int inventory[])
+{
+	FILE* fileDiary = fopen(fileName, "a"); // Вот это всё надо будет прибрать в функцию записи или чёт такое
+
+	if (fileDiary == NULL)
+	{
+		printf("error! No %s found\n", fileName);
+	}
+	else
+	{
+		fprintf(fileDiary, "Diary entry:\nName: %sCurrent day: %d\nCurrent hour: %d\n", name, day, hour);
+		for (int i = 0; i < INVENTORY_SIZE; i++)
+		{
+			fprintf(fileDiary, "[%d] - %s\n", i, inventoryDesc[inventory[i]]);
+		}
+		fprintf(fileDiary, "entry finished\n");
+		fclose(fileDiary);
+		printf("new diary entry in %s\n", fileName);
+	}
+
+}
+
+void decipher(char* fileName, char* fileOutput, int hour)
+{
+	FILE* file = fopen(fileName, "r");
+	FILE* outputFile = fopen(fileOutput, "a");
+	char info[STRING_DEFAULT];
+	if (file == NULL)
+	{
+		printf("error! No %s found\n", fileName);	
+	}
+	else
+	{
+		while (fgets(info, STRING_DEFAULT, file) != NULL)
+		{
+			info[strcspn(info, "\r\n")] = '\0';   // убираем перевод строки
+
+			char* name = strtok(info, ";");
+			char* workStart = strtok(NULL, ";");
+			char* workEnd = strtok(NULL, ";");
+			char* workPlace = strtok(NULL, ";");
+
+			printf("%s is at %s. ", name, workPlace);
+			if (hour >= atoi(workStart) && hour < atoi(workEnd)) printf("[AT WORK]\n");
+			else printf("[RESTING HOME]\n");
+
+			fprintf(outputFile, "%s is at %s. ", name, workPlace);
+			if (hour >= atoi(workStart) && hour < atoi(workEnd)) fprintf(outputFile, "[AT WORK]\n");
+			else fprintf(outputFile, "[RESTING HOME]\n");
+		}
+		fclose(file);
+	}
 }
