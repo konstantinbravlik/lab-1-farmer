@@ -1,11 +1,20 @@
 #include <stdio.h>
 #include <string.h>
+#include <conio.h> // вот эта библиотека для getch() чтобы получать ввод с клавы для управления в данже
+#include <stdlib.h> // тупо ради одной константы для рандома
+#include <time.h> // для рандомной рандомности
 #define INVENTORY_SIZE 10
 #define STRING_DEFAULT 33
 #define PLAYER_DEFAULT 1
 #define DAY_DEFAULT 1
 #define HOUR_DEFAULT 8
 #define DAY_LENGTH_HOURS 24
+#define MAP_MIN 5
+#define MAP_MAX 30
+#define MAP_WALL '#'
+#define MAP_EMPTY '.'
+#define MAP_PLAYER '@'
+#define MAP_EXIT 'Q'
 #define ERR_DEFAULT "error! Please use a valid int! (press enter and retry)"
 #define ERR_DEFAULT_INV "error! Please use a valid int from 0 to 9! (press enter and retry)"
 
@@ -20,14 +29,17 @@ void comparer(char inventoryDesc[][STRING_DEFAULT], int inventory[]);
 void searchItem(char inventoryDesc[][STRING_DEFAULT], int inventory[]);
 void diaryWrite(char* fileName, char name[STRING_DEFAULT], int hour, int day, char inventoryDesc[][STRING_DEFAULT], int inventory[]);
 void decipher(char* fileName, char* fileOutput, int hour);
+int random(int min, int max);
+void adventure();
 
 int main()
 {
+	srand((unsigned)time(NULL)); // сид для рандома
+
 	int current_day = DAY_DEFAULT; // день
 	int current_hour = HOUR_DEFAULT; // час
 	int inventory[INVENTORY_SIZE] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // инвентарь
 	char inventoryDescription[INVENTORY_SIZE][STRING_DEFAULT] = {"empty", "seeds", "wood", "stone", "coal", "watering can", "axe", "hoe", "rake", "scythe"};
-	int tempInput, tempInput2; // ну типа эта кароче эээ ну темпорари вариаблс
 	int playerInput = PLAYER_DEFAULT;
 	char playerName[STRING_DEFAULT];
 	FILE* fileItems = fopen("items.txt", "r");
@@ -51,6 +63,7 @@ int main()
 	printf("Welcome to Happy Farmer(tm, all rights reserved, rated M for Mature)\n\n");
 	printf("What is your name, Farmer? ");
 	fgets(playerName, STRING_DEFAULT, stdin);
+	playerName[strcspn(playerName, "\r\n")] = '\0'; // фикс имени
 
 	while (playerInput != 0) // Главный цикл 
 	{
@@ -64,7 +77,8 @@ int main()
 		printf("6 - find items heavier than X in your inventory\n");
 		printf("7 - search for item name\n");
 		printf("8 - write in diary\n");
-		printf("9 - get villager info\n\n");
+		printf("9 - get villager info\n");
+		printf("10 - go on an adventure\n\n");
 
 		playerInput = checkInput("Option: ", ERR_DEFAULT);
 
@@ -99,6 +113,9 @@ int main()
 			break;
 		case 9:
 			decipher("input.txt", "output.txt", current_hour);
+			break;
+		case 10:
+			adventure();
 			break;
 		}
 	}
@@ -260,4 +277,142 @@ void decipher(char* fileName, char* fileOutput, int hour)
 		}
 		fclose(file);
 	}
+}
+
+int random(int min, int max)
+{
+	return (rand() % (max + 1 - min) + min);
+
+}
+
+void adventure()
+{
+	/*
+	Я немножко дурачок так что Y тут это <-> там влево вправо			
+	а X получается	вверх вниз
+	дэбил
+	*/
+	int row, col, isPlayer, playerX, playerY, ranResult;
+	isPlayer = 0;
+	char input = ' ';
+	char bufferDraw;
+	row = random(MAP_MIN, MAP_MAX);
+	col = random(MAP_MIN, MAP_MAX);
+	printf("height: %d\n width: %d\n", row, col); // debug
+	
+	char** map;
+	// 1. Выделяем память под массив указателей (строк)
+	map = (char**)malloc(row * sizeof(char*));
+	// 2. В цикле выделяем память под каждую строку (столбцы)
+	for (int i = 0; i < row; i++) {
+		map[i] = (char*)malloc(col * sizeof(char));
+	}
+
+	for (int i = 0; i < row; i++) // генератор карты (потом мб перенести в отдельную функцию)
+	{
+		for (int j = 0; j < col; j++)
+		{
+			if (i == 0 || i == row - 1 || j == 0 || j == col - 1) 
+			{
+				map[i][j] = MAP_WALL; // рисуем стены
+			}
+			else
+			{
+				ranResult = random(0, 10); // штука которая делает рандомные препятствия
+				switch (ranResult)
+				{
+				case 0:
+					map[i][j] = 'M'; // рандом препятствие (потом наверно изменю)
+					break;
+			/*	
+			кароче пытался сделать еще генерацию входа но уже туплю сегодня
+				case 1:
+			
+					if (map[i][j] != MAP_WALL && isExit == 0)
+					{
+						isExit = 1;
+						exitX = i;
+						exitY = j;
+						map[i][j] = MAP_EXIT;
+					}
+					break; 
+			*/	
+				default:
+					map[i][j] = MAP_EMPTY;
+					break;
+				}
+			}
+			if (map[i][j] == MAP_EMPTY && isPlayer == 0)
+			{
+				bufferDraw = map[i][j]; // запоминаем что было на клетке до игрока
+				isPlayer = 1;
+				playerX = i;
+				playerY = j;
+				map[i][j] = MAP_PLAYER;
+			}
+		}
+	}
+
+	while (input != 'q' && 'Q') // потом проверять что стоим на точке где можно выйти (но это потом) вроде не сложно проверить
+	{
+		system("cls");
+		for (int i = 0; i < row; i++) // отрисовка карты
+		{
+			for (int j = 0; j < col; j++)
+			{
+				printf("%c", map[i][j]);
+			}
+			printf("\n");
+		}
+		input = _getch();
+		switch (input) // движение
+		{
+		case 'w':
+		case 'W':
+			if (map[playerX - 1][playerY] != MAP_WALL && map[playerX - 1][playerY] != 'M')
+			{
+				map[playerX][playerY] = bufferDraw;
+				bufferDraw = map[playerX - 1][playerY];
+				map[playerX - 1][playerY] = MAP_PLAYER;
+				playerX--;
+			}
+			break;
+		case 'a':
+		case 'A':
+			if (map[playerX][playerY - 1] != MAP_WALL && map[playerX][playerY - 1] != 'M')
+			{
+				map[playerX][playerY] = bufferDraw;
+				bufferDraw = map[playerX][playerY - 1];
+				map[playerX][playerY - 1] = MAP_PLAYER;
+				playerY--;
+			}
+			break;
+		case 's':
+		case 'S':
+			if (map[playerX + 1][playerY] != MAP_WALL && map[playerX + 1][playerY] != 'M')
+			{
+				map[playerX][playerY] = bufferDraw;
+				bufferDraw = map[playerX + 1][playerY];
+				map[playerX + 1][playerY] = MAP_PLAYER;
+				playerX++;
+			}
+			break;
+		case 'd':
+		case 'D':
+			if (map[playerX][playerY + 1] != MAP_WALL && map[playerX][playerY + 1] != 'M')
+			{
+				map[playerX][playerY] = bufferDraw;
+				bufferDraw = map[playerX][playerY + 1];
+				map[playerX][playerY + 1] = MAP_PLAYER;
+				playerY++;
+			}
+			break;
+		}
+	}
+
+	for (int i = 0; i < row; i++) {
+		free(map[i]);
+	}
+	free(map);
+	system("cls");
 }
