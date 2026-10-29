@@ -15,6 +15,7 @@
 #define MAP_EMPTY '.'
 #define MAP_PLAYER '@'
 #define MAP_EXIT 'Q'
+#define MAP_ROCK 'R'
 #define ERR_DEFAULT "error! Please use a valid int! (press enter and retry)"
 #define ERR_DEFAULT_INV "error! Please use a valid int from 0 to 9! (press enter and retry)"
 
@@ -30,6 +31,8 @@ void searchItem(char inventoryDesc[][STRING_DEFAULT], int inventory[]);
 void diaryWrite(char* fileName, char name[STRING_DEFAULT], int hour, int day, char inventoryDesc[][STRING_DEFAULT], int inventory[]);
 void decipher(char* fileName, char* fileOutput, int hour);
 int random(int min, int max);
+char** generateMap(int row, int col, int* playerX, int* playerY, int* exitX, int* exitY, char* bufferDraw); // Генерирует карту
+void drawMap(char** map, int row, int col); // Отрисовывает карту
 void adventure();
 
 int main()
@@ -285,20 +288,11 @@ int random(int min, int max)
 
 }
 
-void adventure()
+char** generateMap(int row, int col, int* playerX, int* playerY, int* exitX, int* exitY, char* bufferDraw)
 {
-	/*
-	Я немножко дурачок так что Y тут это <-> там влево вправо			
-	а X получается	вверх вниз
-	дэбил
-	*/
-	int row, col, isPlayer, playerX, playerY, ranResult;
-	isPlayer = 0;
-	char input = ' ';
-	char bufferDraw;
-	row = random(MAP_MIN, MAP_MAX);
-	col = random(MAP_MIN, MAP_MAX);
-	printf("height: %d\n width: %d\n", row, col); // debug
+	int isPlayer = 0;
+	int isExit = 0;
+	int ranResult;
 	
 	char** map;
 	// 1. Выделяем память под массив указателей (строк)
@@ -312,7 +306,7 @@ void adventure()
 	{
 		for (int j = 0; j < col; j++)
 		{
-			if (i == 0 || i == row - 1 || j == 0 || j == col - 1) 
+			if (i == 0 || i == row - 1 || j == 0 || j == col - 1)
 			{
 				map[i][j] = MAP_WALL; // рисуем стены
 			}
@@ -322,21 +316,19 @@ void adventure()
 				switch (ranResult)
 				{
 				case 0:
-					map[i][j] = 'M'; // рандом препятствие (потом наверно изменю)
+					map[i][j] = MAP_ROCK; // рандом препятствие (потом наверно изменю)
 					break;
-			/*	
-			кароче пытался сделать еще генерацию входа но уже туплю сегодня
 				case 1:
-			
+
 					if (map[i][j] != MAP_WALL && isExit == 0)
 					{
 						isExit = 1;
-						exitX = i;
-						exitY = j;
+						*exitX = i;
+						*exitY = j;
 						map[i][j] = MAP_EXIT;
 					}
-					break; 
-			*/	
+					else map[i][j] = MAP_EMPTY;
+					break;
 				default:
 					map[i][j] = MAP_EMPTY;
 					break;
@@ -344,32 +336,58 @@ void adventure()
 			}
 			if (map[i][j] == MAP_EMPTY && isPlayer == 0)
 			{
-				bufferDraw = map[i][j]; // запоминаем что было на клетке до игрока
+				*bufferDraw = map[i][j]; // запоминаем что было на клетке до игрока
 				isPlayer = 1;
-				playerX = i;
-				playerY = j;
+				*playerX = i;
+				*playerY = j;
 				map[i][j] = MAP_PLAYER;
 			}
 		}
 	}
 
+	return map;
+}
+
+void drawMap(char** map, int row, int col)
+{
+	for (int i = 0; i < row; i++)
+	{
+		for (int j = 0; j < col; j++)
+		{
+			printf("%c", map[i][j]);
+		}
+		printf("\n");
+	}
+}
+
+void adventure()
+{
+	/*
+	Я немножко дурачок так что Y тут это <-> там влево вправо			
+	а X получается	вверх вниз
+	дэбил
+	*/
+	int row, col, playerX, playerY, exitX, exitY;
+	int floor = 1;
+	char input = ' ';
+	char bufferDraw;
+	row = random(MAP_MIN, MAP_MAX); // рандомно
+	col = random(MAP_MIN, MAP_MAX); // делаем размер
+//	printf("height: %d\n width: %d\n", row, col); // debug
+	
+	char** map = generateMap(row, col, &playerX, &playerY, &exitX, &exitY, &bufferDraw); // делаем нашу карту
+	
 	while (input != 'q' && 'Q') // потом проверять что стоим на точке где можно выйти (но это потом) вроде не сложно проверить
 	{
 		system("cls");
-		for (int i = 0; i < row; i++) // отрисовка карты
-		{
-			for (int j = 0; j < col; j++)
-			{
-				printf("%c", map[i][j]);
-			}
-			printf("\n");
-		}
+		printf("Tower floor %d\n", floor);
+		drawMap(map, row, col);
 		input = _getch();
 		switch (input) // движение
 		{
 		case 'w':
 		case 'W':
-			if (map[playerX - 1][playerY] != MAP_WALL && map[playerX - 1][playerY] != 'M')
+			if (map[playerX - 1][playerY] != MAP_WALL && map[playerX - 1][playerY] != MAP_ROCK)
 			{
 				map[playerX][playerY] = bufferDraw;
 				bufferDraw = map[playerX - 1][playerY];
@@ -379,7 +397,7 @@ void adventure()
 			break;
 		case 'a':
 		case 'A':
-			if (map[playerX][playerY - 1] != MAP_WALL && map[playerX][playerY - 1] != 'M')
+			if (map[playerX][playerY - 1] != MAP_WALL && map[playerX][playerY - 1] != MAP_ROCK)
 			{
 				map[playerX][playerY] = bufferDraw;
 				bufferDraw = map[playerX][playerY - 1];
@@ -389,7 +407,7 @@ void adventure()
 			break;
 		case 's':
 		case 'S':
-			if (map[playerX + 1][playerY] != MAP_WALL && map[playerX + 1][playerY] != 'M')
+			if (map[playerX + 1][playerY] != MAP_WALL && map[playerX + 1][playerY] != MAP_ROCK)
 			{
 				map[playerX][playerY] = bufferDraw;
 				bufferDraw = map[playerX + 1][playerY];
@@ -399,7 +417,7 @@ void adventure()
 			break;
 		case 'd':
 		case 'D':
-			if (map[playerX][playerY + 1] != MAP_WALL && map[playerX][playerY + 1] != 'M')
+			if (map[playerX][playerY + 1] != MAP_WALL && map[playerX][playerY + 1] != MAP_ROCK)
 			{
 				map[playerX][playerY] = bufferDraw;
 				bufferDraw = map[playerX][playerY + 1];
