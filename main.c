@@ -246,7 +246,7 @@ void diaryWrite(char* fileName, char name[STRING_DEFAULT], int hour, int day, ch
 	}
 	else
 	{
-		fprintf(fileDiary, "Diary entry:\nName: %sCurrent day: %d\nCurrent hour: %d\n", name, day, hour);
+		fprintf(fileDiary, "Diary entry:\nName: %s\nCurrent day: %d\nCurrent hour: %d\n", name, day, hour);
 		for (int i = 0; i < INVENTORY_SIZE; i++)
 		{
 			fprintf(fileDiary, "[%d] - %s\n", i, inventoryDesc[inventory[i]]);
