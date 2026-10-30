@@ -3,6 +3,8 @@
 #include <conio.h> // вот эта библиотека для getch() чтобы получать ввод с клавы для управления в данже
 #include <stdlib.h> // тупо ради одной константы для рандома
 #include <time.h> // для рандомной рандомности
+#define _CRTDBG_MAP_ALLOC // дебаг на утечки памяти
+#include <crtdbg.h>
 #define INVENTORY_SIZE 10
 #define STRING_DEFAULT 33
 #define PLAYER_DEFAULT 1
@@ -11,11 +13,14 @@
 #define DAY_LENGTH_HOURS 24
 #define MAP_MIN 5
 #define MAP_MAX 30
+#define MAP_VOID_TIMER 5
 #define MAP_WALL '#'
 #define MAP_EMPTY '.'
 #define MAP_PLAYER '@'
-#define MAP_EXIT 'Q'
+#define MAP_EXIT 'D'
+#define MAP_UP 'U'
 #define MAP_ROCK 'R'
+#define MAP_VOID ' '
 #define ERR_DEFAULT "error! Please use a valid int! (press enter and retry)"
 #define ERR_DEFAULT_INV "error! Please use a valid int from 0 to 9! (press enter and retry)"
 
@@ -30,9 +35,12 @@ void comparer(char inventoryDesc[][STRING_DEFAULT], int inventory[]);
 void searchItem(char inventoryDesc[][STRING_DEFAULT], int inventory[]);
 void diaryWrite(char* fileName, char name[STRING_DEFAULT], int hour, int day, char inventoryDesc[][STRING_DEFAULT], int inventory[]);
 void decipher(char* fileName, char* fileOutput, int hour);
-int random(int min, int max);
-char** generateMap(int row, int col, int* playerX, int* playerY, int* exitX, int* exitY, char* bufferDraw); // Генерирует карту
+int random(int min, int max); // рандом в границах min и max
+char** generateMap(int row, int col, int* playerX, int* playerY, int* upCounter, char* bufferDraw); // Генерирует карту
 void drawMap(char** map, int row, int col); // Отрисовывает карту
+int isWalkable(char mapUnit); // можно ходить бродить?
+void walk(char** map, int* playerX, int* playerY, char* bufferDraw, int xMove, int yMove); // ходилка бродилка
+void floorCrumble(char** map, int row, int col, int* voidProgress, int* died, int* escaped, int* upCounter); // пол ломат
 void adventure();
 
 int main()
@@ -122,7 +130,7 @@ int main()
 			break;
 		}
 	}
-	
+	_CrtDumpMemoryLeaks();
 	return 0;
 }
 
@@ -279,6 +287,7 @@ void decipher(char* fileName, char* fileOutput, int hour)
 			else fprintf(outputFile, "[RESTING HOME]\n");
 		}
 		fclose(file);
+		fclose(outputFile);
 	}
 }
 
@@ -288,10 +297,10 @@ int random(int min, int max)
 
 }
 
-char** generateMap(int row, int col, int* playerX, int* playerY, int* exitX, int* exitY, char* bufferDraw)
+char** generateMap(int row, int col, int* playerX, int* playerY, int* upCounter, char* bufferDraw)
 {
 	int isPlayer = 0;
-	int isExit = 0;
+	int isUp = 0;
 	int ranResult;
 	
 	char** map;
@@ -302,7 +311,7 @@ char** generateMap(int row, int col, int* playerX, int* playerY, int* exitX, int
 		map[i] = (char*)malloc(col * sizeof(char));
 	}
 
-	for (int i = 0; i < row; i++) // генератор карты (потом мб перенести в отдельную функцию)
+	for (int i = 0; i < row; i++) // генератор карты 
 	{
 		for (int j = 0; j < col; j++)
 		{
@@ -318,33 +327,58 @@ char** generateMap(int row, int col, int* playerX, int* playerY, int* exitX, int
 				case 0:
 					map[i][j] = MAP_ROCK; // рандом препятствие (потом наверно изменю)
 					break;
-				case 1:
-
-					if (map[i][j] != MAP_WALL && isExit == 0)
-					{
-						isExit = 1;
-						*exitX = i;
-						*exitY = j;
-						map[i][j] = MAP_EXIT;
-					}
-					else map[i][j] = MAP_EMPTY;
-					break;
 				default:
 					map[i][j] = MAP_EMPTY;
 					break;
 				}
 			}
-			if (map[i][j] == MAP_EMPTY && isPlayer == 0)
+		}
+	}
+	
+	for (int i = 0; i < row; i++) // рандом появление игрока и лестниц вверх
+	{
+		for (int j = 0; j < col; j++)
+		{
+			ranResult = random(0, 20); 
+			switch (ranResult)
 			{
-				*bufferDraw = map[i][j]; // запоминаем что было на клетке до игрока
-				isPlayer = 1;
-				*playerX = i;
-				*playerY = j;
-				map[i][j] = MAP_PLAYER;
+			case 0:
+				if (map[i][j] != MAP_WALL)
+				{
+					isUp = 1;
+					map[i][j] = MAP_UP;
+					*upCounter = *upCounter + 1;
+				}
+				break;
+			case 1:
+				if (map[i][j] != MAP_WALL && isPlayer == 0)
+				{
+					*bufferDraw = MAP_EXIT; // под игроком появляется выход
+					isPlayer = 1;
+					*playerX = i;
+					*playerY = j;
+					map[i][j] = MAP_PLAYER;
+				}
+				break;
 			}
 		}
 	}
+	if (isPlayer == 0) // если рандомно игрок не появился
+	{
+		*bufferDraw = map[1][1];
+		isPlayer = 1;
+		*playerX = 1;
+		*playerY = 1;
+		map[1][1] = MAP_PLAYER;
+	}
 
+	if (isUp == 0) // если рандомно выход не появился
+	{
+		isUp = 1;
+		map[2][2] = MAP_UP;
+		*upCounter = *upCounter + 1;
+	}
+	
 	return map;
 }
 
@@ -360,6 +394,46 @@ void drawMap(char** map, int row, int col)
 	}
 }
 
+int isWalkable(char mapUnit)
+{
+	return mapUnit != MAP_WALL && mapUnit != MAP_ROCK && mapUnit != MAP_VOID;
+}
+
+void walk(char** map, int* playerX, int* playerY, char* bufferDraw, int* turn, int xMove, int yMove)
+{
+	if (isWalkable(map[*playerX + xMove][*playerY + yMove]))
+	{
+		map[*playerX][*playerY] = *bufferDraw;
+		*bufferDraw = map[*playerX + xMove][*playerY + yMove];
+		map[*playerX + xMove][*playerY + yMove] = MAP_PLAYER;
+		*playerX += xMove;
+		*playerY += yMove;
+		(*turn)++;
+	}
+}
+
+void floorCrumble(char** map, int row, int col, int* voidProgress, int* died, int* escaped, int* upCounter)
+{
+	for (int i = 0; i < row; i++)
+	{
+		for (int j = 0; j < col; j++)
+		{
+			if (i == *voidProgress || i == row - *voidProgress - 1 || j == *voidProgress || j == col - *voidProgress - 1)
+			{
+				if (i == 0 || i == row - 1 || j == 0 || j == col - 1)	continue;   // не трогаем внешнюю стену
+				if (map[i][j] == MAP_PLAYER)
+				{
+					*died = 1;
+					*escaped = 1; // выкидываем если игрока съело
+				}
+				else if (map[i][j] == MAP_UP) (*upCounter)--; // ведем счёт сколько лестниц вверх осталось
+				map[i][j] = MAP_VOID; // войдим
+			}
+		}
+	}
+	(*voidProgress)++; // увеличиваем колечко
+}
+
 void adventure()
 {
 	/*
@@ -367,70 +441,91 @@ void adventure()
 	а X получается	вверх вниз
 	дэбил
 	*/
-	int row, col, playerX, playerY, exitX, exitY;
+	int row, col, playerX, playerY;
+	int voidProgress = 1;
+	int upCounter = 0;
 	int floor = 1;
+	int turn = 1;
+	int escaped = 0;
+	int died = 0;
+	int evacuated = 0;
 	char input = ' ';
 	char bufferDraw;
 	row = random(MAP_MIN, MAP_MAX); // рандомно
 	col = random(MAP_MIN, MAP_MAX); // делаем размер
-//	printf("height: %d\n width: %d\n", row, col); // debug
 	
-	char** map = generateMap(row, col, &playerX, &playerY, &exitX, &exitY, &bufferDraw); // делаем нашу карту
+	char** map = generateMap(row, col, &playerX, &playerY, &upCounter, &bufferDraw); // делаем нашу карту
 	
-	while (input != 'q' && 'Q') // потом проверять что стоим на точке где можно выйти (но это потом) вроде не сложно проверить
-	{
+	while (escaped != 1) // потом проверять что стоим на точке где можно выйти (но это потом) вроде не сложно проверить
+	{	
 		system("cls");
 		printf("Tower floor %d\n", floor);
+
+		if ((turn + 1) % MAP_VOID_TIMER == 0) printf("Turn %d, the ground rumbles...\n", turn);
+		else printf("Turn %d\n", turn);
+		
 		drawMap(map, row, col);
+		
 		input = _getch();
+		if (upCounter <= 0)
+		{
+			printf("WARNING !!! NO LADDERS REMAIN !!! PRESS 'Q' TO EVACUATE !!!\n");
+			do
+			{
+				input = _getch();
+			} while (input != 'q' && input != 'Q');
+			evacuated = 1;
+			escaped = 1;
+		}
+		
 		switch (input) // движение
 		{
-		case 'w':
-		case 'W':
-			if (map[playerX - 1][playerY] != MAP_WALL && map[playerX - 1][playerY] != MAP_ROCK)
+		case 'w': case 'W': walk(map, &playerX, &playerY, &bufferDraw, &turn, -1, 0); break;
+		case 'a': case 'A': walk(map, &playerX, &playerY, &bufferDraw, &turn, 0, -1); break;
+		case 's': case 'S': walk(map, &playerX, &playerY, &bufferDraw, &turn, 1, 0); break;
+		case 'd': case 'D': walk(map, &playerX, &playerY, &bufferDraw, &turn, 0, 1); break;
+		
+		case 'q':
+		case 'Q':
+			if (bufferDraw == MAP_EXIT)
 			{
-				map[playerX][playerY] = bufferDraw;
-				bufferDraw = map[playerX - 1][playerY];
-				map[playerX - 1][playerY] = MAP_PLAYER;
-				playerX--;
+				escaped = 1;
 			}
-			break;
-		case 'a':
-		case 'A':
-			if (map[playerX][playerY - 1] != MAP_WALL && map[playerX][playerY - 1] != MAP_ROCK)
-			{
-				map[playerX][playerY] = bufferDraw;
-				bufferDraw = map[playerX][playerY - 1];
-				map[playerX][playerY - 1] = MAP_PLAYER;
-				playerY--;
-			}
-			break;
-		case 's':
-		case 'S':
-			if (map[playerX + 1][playerY] != MAP_WALL && map[playerX + 1][playerY] != MAP_ROCK)
-			{
-				map[playerX][playerY] = bufferDraw;
-				bufferDraw = map[playerX + 1][playerY];
-				map[playerX + 1][playerY] = MAP_PLAYER;
-				playerX++;
-			}
-			break;
-		case 'd':
-		case 'D':
-			if (map[playerX][playerY + 1] != MAP_WALL && map[playerX][playerY + 1] != MAP_ROCK)
-			{
-				map[playerX][playerY] = bufferDraw;
-				bufferDraw = map[playerX][playerY + 1];
-				map[playerX][playerY + 1] = MAP_PLAYER;
-				playerY++;
-			}
+			turn++;
 			break;
 		}
-	}
+		
+		if (bufferDraw == MAP_UP) // новый этаж если поднимаемся
+		{
+			// всякие конфиги для нового этажа
+			floor++;
+			voidProgress = 1;
+			upCounter = 0;
+			turn = 1;
 
-	for (int i = 0; i < row; i++) {
-		free(map[i]);
+			for (int i = 0; i < row; i++) free(map[i]); // чуть не забыл освободить память перед новой генерацией ой дурааак
+			free(map);
+			
+			map = generateMap(row, col, &playerX, &playerY, &upCounter, &bufferDraw);
+		}
+
+		if (turn % MAP_VOID_TIMER == 0)
+		{
+			floorCrumble(map, row, col, &voidProgress, &died, &escaped, &upCounter);
+		}
 	}
+	
+	system("cls");
+
+	drawMap(map, row, col);
+
+	for (int i = 0; i < row; i++) free(map[i]);
 	free(map);
+	
+
+	if (evacuated == 1) printf("Evacuated!\nPress any button to return to main menu...");
+	else if (died == 1) printf("The floor crumbled with you!\nPress any button to return to main menu...");
+	else printf("Adventure run ended\nPress any button to return to main menu...");
+	_getch();
 	system("cls");
 }
