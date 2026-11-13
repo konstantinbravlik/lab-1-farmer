@@ -1,16 +1,12 @@
 #include <stdio.h>
 #include <string.h>
-#include <conio.h> // вот эта библиотека для getch() чтобы получать ввод с клавы для управления в данже
-#include <stdlib.h> // тупо ради одной константы для рандома
-#include <time.h> // для рандомной рандомности
-#define _CRTDBG_MAP_ALLOC // дебаг на утечки памяти
+#include <conio.h>
+#include <stdlib.h>
+#include <time.h>
 #include <crtdbg.h>
-#define INVENTORY_SIZE 10
-#define STRING_DEFAULT 33
+#include "utils.h"       
+
 #define PLAYER_DEFAULT 1
-#define DAY_DEFAULT 1
-#define HOUR_DEFAULT 8
-#define DAY_LENGTH_HOURS 24
 #define MAP_MIN 5
 #define MAP_MAX 30
 #define MAP_VOID_TIMER 5
@@ -21,11 +17,7 @@
 #define MAP_UP 'U'
 #define MAP_ROCK 'R'
 #define MAP_VOID ' '
-#define ERR_DEFAULT "error! Please use a valid int! (press enter and retry)"
-#define ERR_DEFAULT_INV "error! Please use a valid int from 0 to 9! (press enter and retry)"
 
-int checkInputInventory(char* message, char* errorMessage); // та же функция что checkInput, но с другими условиями проверки
-int checkInput(char* message, char* errorMessage); // проверяет ввод на валидность
 void timeCheck(int day, int hour); // смотрим время
 void checkInventory(char inventoryDesc[][STRING_DEFAULT], int inventory[]); // смотрим инвентарь
 void work(int* day, int* hour); // работаем 
@@ -35,7 +27,6 @@ void comparer(char inventoryDesc[][STRING_DEFAULT], int inventory[]);
 void searchItem(char inventoryDesc[][STRING_DEFAULT], int inventory[]);
 void diaryWrite(char* fileName, char name[STRING_DEFAULT], int hour, int day, char inventoryDesc[][STRING_DEFAULT], int inventory[]);
 void decipher(char* fileName, char* fileOutput, int hour);
-int random(int min, int max); // рандом в границах min и max
 char** generateMap(int row, int col, int* playerX, int* playerY, int* upCounter, char* bufferDraw); // Генерирует карту
 void drawMap(char** map, int row, int col); // Отрисовывает карту
 int isWalkable(char mapUnit); // можно ходить бродить?
@@ -132,30 +123,6 @@ int main()
 	}
 	_CrtDumpMemoryLeaks();
 	return 0;
-}
-
-int checkInputInventory(char* message, char* errorMessage)
-{
-	int input;
-	printf("%s\n", message);
-	while (scanf("%d", &input) != 1 || input > 9 || input < 0)
-	{
-		printf("%s", errorMessage);
-		while (getchar() != '\n');
-	}
-	return input;
-}
-
-int checkInput(char* message, char* errorMessage)
-{
-	int input;
-	printf("%s\n", message);
-	while (scanf("%d", &input) != 1)
-	{
-		printf("%s", errorMessage);
-		while (getchar() != '\n');
-	}
-	return input;
 }
 
 void timeCheck(int day, int hour)
@@ -291,12 +258,6 @@ void decipher(char* fileName, char* fileOutput, int hour)
 	}
 }
 
-int random(int min, int max)
-{
-	return (rand() % (max + 1 - min) + min);
-
-}
-
 char** generateMap(int row, int col, int* playerX, int* playerY, int* upCounter, char* bufferDraw)
 {
 	int isPlayer = 0;
@@ -321,7 +282,7 @@ char** generateMap(int row, int col, int* playerX, int* playerY, int* upCounter,
 			}
 			else
 			{
-				ranResult = random(0, 10); // штука которая делает рандомные препятствия
+				ranResult = randomInt(0, 10); // штука которая делает рандомные препятствия
 				switch (ranResult)
 				{
 				case 0:
@@ -339,7 +300,7 @@ char** generateMap(int row, int col, int* playerX, int* playerY, int* upCounter,
 	{
 		for (int j = 0; j < col; j++)
 		{
-			ranResult = random(0, 20); 
+			ranResult = randomInt(0, 20); 
 			switch (ranResult)
 			{
 			case 0:
@@ -451,8 +412,8 @@ void adventure()
 	int evacuated = 0;
 	char input = ' ';
 	char bufferDraw;
-	row = random(MAP_MIN, MAP_MAX); // рандомно
-	col = random(MAP_MIN, MAP_MAX); // делаем размер
+	row = randomInt(MAP_MIN, MAP_MAX); // рандомно
+	col = randomInt(MAP_MIN, MAP_MAX); // делаем размер
 	
 	char** map = generateMap(row, col, &playerX, &playerY, &upCounter, &bufferDraw); // делаем нашу карту
 	
