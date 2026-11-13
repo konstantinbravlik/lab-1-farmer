@@ -57,3 +57,4 @@ dkms.conf
 # generated files
 output.txt
 diary.txt
+.vs/
